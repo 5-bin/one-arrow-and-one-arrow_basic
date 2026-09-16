@@ -99,7 +99,6 @@ dist/一箭又一箭/一箭又一箭
 │   ├── test_game_logic.py  # 19 项纯逻辑自动化测试
 │   └── TEST_RECORD_TEMPLATE.md  # 人工测试记录表
 ├── docs/项目报告.md         # 作业提交用项目报告
-└── dist/                   # PyInstaller 打包产物
 ```
 
 ## 测试
