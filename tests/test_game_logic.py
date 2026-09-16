@@ -131,6 +131,34 @@ class TestLevelData(unittest.TestCase):
                 self.assertGreater(level["max_mistakes"], 0)
 
 
+class TestLevelSolver(unittest.TestCase):
+    """DFS 关卡验证器必须使用原有阻挡规则且不污染游戏数据。"""
+
+    def test_every_preset_level_has_a_complete_dfs_solution(self):
+        for level in main.LEVELS:
+            with self.subTest(level=level["name"]):
+                before = [dict(arrow) for arrow in level["arrows"]]
+                solution = main.solve_level(level["arrows"], main.BOARD_ROWS, main.BOARD_COLS)
+                self.assertIsNotNone(solution)
+                self.assertEqual(len(solution), len(level["arrows"]))
+                self.assertEqual(level["arrows"], before)
+
+    def test_solver_returns_none_for_mutually_blocked_arrows(self):
+        arrows = [
+            make_arrow(3, 1, main.Direction.RIGHT),
+            make_arrow(3, 5, main.Direction.LEFT),
+        ]
+        self.assertIsNone(main.solve_level(arrows, 7, 8))
+
+    def test_solver_reports_search_protection_limit(self):
+        arrows = [
+            make_arrow(3, 2, main.Direction.RIGHT),
+            make_arrow(3, 5, main.Direction.RIGHT),
+        ]
+        with self.assertRaises(main.SearchLimitExceeded):
+            main.solve_level(arrows, 7, 8, max_nodes=1)
+
+
 class TestHintLogic(unittest.TestCase):
     """提示功能只验证候选选择，动画高亮仍由人工试玩确认。"""
 
