@@ -1,9 +1,11 @@
+# -*- coding: utf-8 -*-
 """“一箭又一箭”Pygame 单文件小游戏。运行前：python3 -m pip install pygame"""
 
 import copy
 import math
 import sys
 from enum import Enum, auto
+from pathlib import Path
 
 import pygame
 
@@ -22,6 +24,18 @@ FLY_SPEED = 720
 FEEDBACK_TIME = 0.30
 MAX_HINTS_PER_LEVEL = 3
 HINT_TIME = 1.0
+
+# 明确指定含中文字符的字体文件，避免 SysFont 找不到字体时静默回退为
+# Pygame 默认字体，进而将中文渲染为方块或乱码。按当前系统依次尝试。
+CHINESE_FONT_PATHS = (
+    "/System/Library/Fonts/STHeiti Light.ttc",       # macOS
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",    # macOS
+    "/Library/Fonts/Arial Unicode.ttf",              # macOS（部分设备）
+    "C:/Windows/Fonts/msyh.ttc",                     # Windows 微软雅黑
+    "C:/Windows/Fonts/simhei.ttf",                   # Windows 黑体
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",  # 常见 Linux 中文字体
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+)
 
 COLOR = {
     "background": (35, 59, 80), "panel": (49, 79, 103),
@@ -123,10 +137,22 @@ def find_available_arrow(arrows):
 
 
 def get_font(size):
-    for name in ("PingFang SC", "Microsoft YaHei", "SimHei"):
-        font = pygame.font.SysFont(name, size)
-        if font:
-            return font
+    """加载具有中文字形的字体文件；最后才尝试系统字体名称。"""
+    for font_path in CHINESE_FONT_PATHS:
+        if Path(font_path).is_file():
+            try:
+                return pygame.font.Font(font_path, size)
+            except pygame.error:
+                # 个别系统可能不支持某种字体集合格式，继续尝试下一项。
+                continue
+
+    # match_font 返回真实文件路径，优于 SysFont 的无提示默认字体回退。
+    for font_name in ("PingFang SC", "Microsoft YaHei", "SimHei", "Noto Sans CJK SC"):
+        font_path = pygame.font.match_font(font_name)
+        if font_path:
+            return pygame.font.Font(font_path, size)
+
+    # 极少数未安装中文字体的环境只能显示英文；提示用户安装字体。
     return pygame.font.Font(None, size)
 
 
