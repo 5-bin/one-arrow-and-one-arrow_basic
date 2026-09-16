@@ -129,12 +129,12 @@ class ModalDialog:
         draw_button(screen, cancel_rect, cancel_text, button_font, mouse_position, "secondary")
 
 
-def draw_arrow(screen, arrow, fill_color, highlighted=False):
+def draw_arrow(screen, arrow, fill_color, highlighted=False, scale=1.0):
     board_left = get_board_left(screen.get_width())
     center_x = board_left + arrow["col"] * CELL_SIZE + CELL_SIZE // 2 + arrow["offset_x"]
     center_y = BOARD_TOP + arrow["row"] * CELL_SIZE + CELL_SIZE // 2 + arrow["offset_y"]
     if highlighted:
-        pygame.draw.circle(screen, (255, 234, 154), (round(center_x), round(center_y)), 27)
+        pygame.draw.circle(screen, (255, 234, 154), (round(center_x), round(center_y)), round(27 * scale))
     base_points = [(0, -24), (17, -3), (8, -3), (8, 23), (-8, 23), (-8, -3), (-17, -3)]
     points = []
     for point_x, point_y in base_points:
@@ -142,9 +142,9 @@ def draw_arrow(screen, arrow, fill_color, highlighted=False):
         if direction.name == "DOWN": point_x, point_y = -point_x, -point_y
         elif direction.name == "LEFT": point_x, point_y = point_y, -point_x
         elif direction.name == "RIGHT": point_x, point_y = -point_y, point_x
-        points.append((center_x + point_x, center_y + point_y))
+        points.append((center_x + point_x * scale, center_y + point_y * scale))
     pygame.draw.polygon(screen, fill_color, points)
-    pygame.draw.polygon(screen, COLOR["arrow_outline"], points, width=2)
+    pygame.draw.polygon(screen, COLOR["arrow_outline"], points, width=3 if highlighted else 2)
 
 
 def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None, hint_arrow=None):
@@ -163,7 +163,8 @@ def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None, hint_arr
         if not arrow["eliminated"]:
             is_hint = arrow is hint_arrow
             color = COLOR["danger"] if arrow is feedback_arrow else COLOR["arrow_hover"] if is_hint else COLOR["arrow"]
-            draw_arrow(screen, arrow, color, arrow is hovered_arrow or is_hint)
+            highlighted = arrow is hovered_arrow or is_hint
+            draw_arrow(screen, arrow, color, highlighted, 1.08 if arrow is hovered_arrow else 1.0)
 
 
 def arrow_at_position(arrows, mouse_position, screen_width=None):

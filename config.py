@@ -30,6 +30,10 @@ FLY_SPEED = 720
 FEEDBACK_TIME = 0.30
 MAX_HINTS_PER_LEVEL = 3
 HINT_TIME = 1.0
+# 自动求解在主线程执行；两项上限避免自定义关卡使界面长时间失去响应。
+# 预设最后一关为 7×8=56 支箭头，因此仍可求解全部内置关卡。
+AUTO_SOLVE_MAX_ARROWS = BOARD_ROWS * BOARD_COLS
+AUTO_SOLVE_MAX_NODES = 200_000
 
 # 计分与评价规则：每支箭头基础 100 分；误点被阻挡箭头扣 30 分（不低于 0）。
 SCORE_PER_ARROW = 100

@@ -28,7 +28,7 @@ def is_blocked(arrow, arrows, rows, cols):
     return False
 
 
-def solve_level(arrows, rows, cols, max_nodes=200_000):
+def solve_level(arrows, rows=BOARD_ROWS, cols=BOARD_COLS, max_nodes=200_000):
     """用 DFS + 回溯寻找一条清空 ``arrows`` 的合法顺序。
 
     状态使用“仍存在箭头的索引位掩码”编码。箭头的位置和方向在一次求解中

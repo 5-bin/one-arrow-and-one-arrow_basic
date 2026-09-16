@@ -150,6 +150,30 @@ class TestLevelSolver(unittest.TestCase):
         ]
         self.assertIsNone(main.solve_level(arrows, 7, 8))
 
+    def test_solver_uses_current_remaining_arrows_without_mutating_them(self):
+        """已由玩家消除的箭头不参与搜索，且真实状态保持不变。"""
+        already_removed = make_arrow(3, 1, main.Direction.RIGHT, eliminated=True)
+        remaining = make_arrow(3, 5, main.Direction.RIGHT)
+        arrows = [already_removed, remaining]
+        before = [dict(arrow) for arrow in arrows]
+
+        self.assertEqual(main.solve_level(arrows), [(3, 5, "RIGHT")])
+        self.assertEqual(arrows, before)
+
+    def test_solver_solution_is_legal_step_by_step(self):
+        """求出的每一步都是调用同一 is_blocked 规则后当前可飞的箭头。"""
+        arrows = main.create_level_arrows(1)
+        solution = main.solve_level(arrows)
+        self.assertIsNotNone(solution)
+
+        for row, col, direction in solution:
+            arrow = next(item for item in arrows if (
+                item["row"], item["col"], item["direction"].value
+            ) == (row, col, direction))
+            self.assertFalse(main.is_blocked(arrow, arrows, main.BOARD_ROWS, main.BOARD_COLS))
+            arrows.remove(arrow)
+        self.assertEqual(arrows, [])
+
     def test_solver_reports_search_protection_limit(self):
         arrows = [
             make_arrow(3, 2, main.Direction.RIGHT),

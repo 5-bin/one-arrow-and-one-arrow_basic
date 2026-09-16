@@ -209,6 +209,7 @@ def run_game():
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption("一箭又一箭")
     clock = pygame.time.Clock()
+    sound_manager = SoundManager()
     title_font, large_font = get_font(FONT_SIZE_TITLE), get_font(FONT_SIZE_LARGE)
     normal_font, small_font, tiny_font = get_font(FONT_SIZE_NORMAL), get_font(FONT_SIZE_SMALL), get_font(FONT_SIZE_TINY)
 
@@ -224,6 +225,10 @@ def run_game():
     hints_remaining = MAX_HINTS_PER_LEVEL
     hint_arrow = None
     hint_elapsed = 0.0
+    auto_solution = []
+    auto_playing = False
+    result_elapsed = 0.0
+    result_state = None
     message = ""
     modal = ModalDialog()
 
@@ -235,18 +240,20 @@ def run_game():
         pygame.Rect(250 + (index % 3) * 160, 245 + (index // 3) * 110, 140, 76)
         for index in range(len(LEVELS))
     ]
-    restart_button = pygame.Rect(BOARD_LEFT + 20, 634, 150, 40)
-    hint_button = pygame.Rect(BOARD_LEFT + 181, 634, 150, 40)
-    menu_button = pygame.Rect(BOARD_LEFT + 342, 634, 150, 40)
+    restart_button = pygame.Rect(BOARD_LEFT + 8, 634, 118, 40)
+    hint_button = pygame.Rect(BOARD_LEFT + 134, 634, 118, 40)
+    menu_button = pygame.Rect(BOARD_LEFT + 260, 634, 118, 40)
+    auto_solve_button = pygame.Rect(BOARD_LEFT + 386, 634, 118, 40)
     next_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
     home_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 505, BUTTON_WIDTH, BUTTON_HEIGHT)
     retry_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
+    sound_button = pygame.Rect(WINDOW_WIDTH - 118, 82, 86, 32)
 
     def load_level(new_index):
         """唯一的关卡重置入口，保证切关和重开不残留任何动画状态。"""
         nonlocal level_index, arrows, remaining_mistakes, flying_arrow, feedback_arrow
         nonlocal feedback_elapsed, lose_after_feedback, hints_remaining, hint_arrow, hint_elapsed, message
-        nonlocal score, elapsed_time, earned_stars
+        nonlocal score, elapsed_time, earned_stars, auto_solution, auto_playing
         level_index = new_index
         arrows = create_level_arrows(level_index)
         remaining_mistakes = LEVELS[level_index]["max_mistakes"]
@@ -255,20 +262,111 @@ def run_game():
         feedback_elapsed, lose_after_feedback = 0.0, False
         hints_remaining = MAX_HINTS_PER_LEVEL
         hint_arrow, hint_elapsed = None, 0.0
+        auto_solution, auto_playing = [], False
         message = "点击没有阻挡的箭头，让它飞出棋盘"
 
     def abandon_current_round():
         """返回菜单时仅清理本局临时数据，不影响解锁和最高星级。"""
         nonlocal arrows, remaining_mistakes, flying_arrow, feedback_arrow
         nonlocal feedback_elapsed, lose_after_feedback, hints_remaining, hint_arrow, hint_elapsed
-        nonlocal score, elapsed_time, earned_stars, message, state
+        nonlocal score, elapsed_time, earned_stars, message, state, auto_solution, auto_playing
         arrows = []
         remaining_mistakes = 0
         flying_arrow = feedback_arrow = hint_arrow = None
         feedback_elapsed, hint_elapsed, lose_after_feedback = 0.0, 0.0, False
         hints_remaining, score, elapsed_time, earned_stars = 0, 0, 0.0, 0
+        auto_solution, auto_playing = [], False
         message = ""
         state = GameState.START
+
+    def start_next_auto_arrow():
+        """按已验证的解法取下一支真实箭头，仍复用原有飞出动画。"""
+        nonlocal flying_arrow, state, message, auto_solution, auto_playing
+        if not auto_solution:
+            auto_playing = False
+            return
+        row, col, direction = auto_solution.pop(0)
+        flying_arrow = next(
+            (arrow for arrow in arrows
+             if arrow["row"] == row and arrow["col"] == col
+             and arrow["direction"].value == direction),
+            None,
+        )
+        if flying_arrow is None:
+            # 理论上不会发生：玩家在演示期间已被锁定。保留防御性分支，
+            # 防止外部修改关卡数据后出现无提示的卡死。
+            auto_solution, auto_playing = [], False
+            state = GameState.PLAYING
+            message = "自动演示已停止：箭头状态发生变化"
+            return
+        state = GameState.FLYING
+        message = "自动演示中…"
+
+    def update(dt):
+        """集中更新全部基于 delta time 的动画与计时状态。"""
+        nonlocal elapsed_time, hint_arrow, hint_elapsed, flying_arrow, feedback_arrow
+        nonlocal feedback_elapsed, lose_after_feedback, score, earned_stars
+        nonlocal highest_unlocked_index, state, message, result_elapsed, result_state
+
+        if state == GameState.PLAYING and feedback_arrow is None and not modal.is_open:
+            elapsed_time += dt
+
+        if hint_arrow is not None and not modal.is_open:
+            hint_elapsed += dt
+            if hint_elapsed >= HINT_TIME:
+                hint_arrow, hint_elapsed = None, 0.0
+
+        if state == GameState.FLYING and flying_arrow is not None:
+            row_step, col_step = DIRECTION_STEPS[flying_arrow["direction"]]
+            flying_arrow["offset_x"] += col_step * FLY_SPEED * dt
+            flying_arrow["offset_y"] += row_step * FLY_SPEED * dt
+            board_left = (screen.get_width() - BOARD_COLS * CELL_SIZE) // 2
+            center_x = board_left + (flying_arrow["col"] + 0.5) * CELL_SIZE + flying_arrow["offset_x"]
+            center_y = BOARD_TOP + (flying_arrow["row"] + 0.5) * CELL_SIZE + flying_arrow["offset_y"]
+            outside = (center_x < board_left - CELL_SIZE or center_x > board_left + BOARD_COLS * CELL_SIZE + CELL_SIZE
+                       or center_y < BOARD_TOP - CELL_SIZE or center_y > BOARD_TOP + BOARD_ROWS * CELL_SIZE + CELL_SIZE)
+            if outside:
+                if flying_arrow in arrows:
+                    arrows.remove(flying_arrow)
+                    score += SCORE_PER_ARROW
+                    sound_manager.play("fly")
+                flying_arrow = None
+                hint_arrow, hint_elapsed = None, 0.0
+                if not arrows:
+                    earned_stars = calculate_stars(score, elapsed_time, len(LEVELS[level_index]["arrows"]), SCORE_PER_ARROW)
+                    best_stars[level_index] = max(best_stars[level_index], earned_stars)
+                    highest_unlocked_index = max(highest_unlocked_index, min(level_index + 1, len(LEVELS) - 1))
+                    state = GameState.ALL_CLEAR if level_index == len(LEVELS) - 1 else GameState.WIN
+                    sound_manager.play("win")
+                else:
+                    state = GameState.PLAYING
+                    if auto_playing:
+                        start_next_auto_arrow()
+                    else:
+                        message = "成功飞出！"
+
+        if feedback_arrow is not None:
+            feedback_elapsed += dt
+            row_step, col_step = DIRECTION_STEPS[feedback_arrow["direction"]]
+            # 正弦晃动与 dt 累积时间绑定，帧率变化时总时长和振幅仍保持一致。
+            shake = math.sin(feedback_elapsed * 48) * 8
+            feedback_arrow["offset_x"] = shake if col_step else 0.0
+            feedback_arrow["offset_y"] = shake if row_step else 0.0
+            if feedback_elapsed >= FEEDBACK_TIME:
+                feedback_arrow["offset_x"] = feedback_arrow["offset_y"] = 0.0
+                feedback_arrow = None
+                if lose_after_feedback:
+                    state = GameState.LOSE
+                    sound_manager.play("lose")
+                lose_after_feedback = False
+
+        if state in (GameState.WIN, GameState.LOSE, GameState.ALL_CLEAR):
+            if result_state != state:
+                result_state, result_elapsed = state, 0.0
+            else:
+                result_elapsed = min(result_elapsed + dt, 0.35)
+        else:
+            result_state, result_elapsed = None, 0.0
 
     running = True
     while running:
@@ -279,60 +377,7 @@ def run_game():
         def ui_rect(rect):
             return rect.move(layout_offset, 0)
 
-        # 仅允许正常可操作期间计时；飞行、碰撞反馈及结算页面均暂停。
-        if state == GameState.PLAYING and feedback_arrow is None and not modal.is_open:
-            elapsed_time += delta_time
-
-        # 提示只维持一秒，不会自动消除箭头。
-        if hint_arrow is not None and not modal.is_open:
-            hint_elapsed += delta_time
-            if hint_elapsed >= HINT_TIME:
-                hint_arrow, hint_elapsed = None, 0.0
-
-        # 飞行动画期间 state 为 FLYING，所有点击均不会处理。
-        if state == GameState.FLYING and flying_arrow is not None:
-            row_step, col_step = DIRECTION_STEPS[flying_arrow["direction"]]
-            flying_arrow["offset_x"] += col_step * FLY_SPEED * delta_time
-            flying_arrow["offset_y"] += row_step * FLY_SPEED * delta_time
-            board_left = (screen.get_width() - BOARD_COLS * CELL_SIZE) // 2
-            center_x = board_left + (flying_arrow["col"] + 0.5) * CELL_SIZE + flying_arrow["offset_x"]
-            center_y = BOARD_TOP + (flying_arrow["row"] + 0.5) * CELL_SIZE + flying_arrow["offset_y"]
-            outside = (center_x < board_left - CELL_SIZE or center_x > board_left + BOARD_COLS * CELL_SIZE + CELL_SIZE or center_y < BOARD_TOP - CELL_SIZE or center_y > BOARD_TOP + BOARD_ROWS * CELL_SIZE + CELL_SIZE)
-            if outside:
-                # 身份和成员检查确保同一箭头绝不会被重复删除。
-                if flying_arrow in arrows:
-                    arrows.remove(flying_arrow)
-                    score += SCORE_PER_ARROW
-                flying_arrow = None
-                hint_arrow, hint_elapsed = None, 0.0
-                if not arrows:
-                    earned_stars = calculate_stars(
-                        score, elapsed_time, len(LEVELS[level_index]["arrows"]), SCORE_PER_ARROW,
-                    )
-                    best_stars[level_index] = max(best_stars[level_index], earned_stars)
-                    # 完成第 N 关后，开放第 N+1 关；最后一关不再增加索引。
-                    highest_unlocked_index = max(
-                        highest_unlocked_index,
-                        min(level_index + 1, len(LEVELS) - 1),
-                    )
-                    state = GameState.ALL_CLEAR if level_index == len(LEVELS) - 1 else GameState.WIN
-                else:
-                    state = GameState.PLAYING
-                message = "成功飞出！"
-
-        # 碰撞时按箭头方向所在轴晃动，红色由 draw_board 保持到反馈结束。
-        if feedback_arrow is not None:
-            feedback_elapsed += delta_time
-            row_step, col_step = DIRECTION_STEPS[feedback_arrow["direction"]]
-            shake = math.sin(feedback_elapsed * 48) * 8
-            feedback_arrow["offset_x"] = shake if col_step else 0.0
-            feedback_arrow["offset_y"] = shake if row_step else 0.0
-            if feedback_elapsed >= FEEDBACK_TIME:
-                feedback_arrow["offset_x"] = feedback_arrow["offset_y"] = 0.0
-                feedback_arrow = None
-                if lose_after_feedback:
-                    state = GameState.LOSE
-                lose_after_feedback = False
+        update(delta_time)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -360,26 +405,36 @@ def run_game():
                     modal.open("return_menu")
                 continue
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if state == GameState.START and ui_rect(start_button).collidepoint(event.pos):
+                if state == GameState.PLAYING and ui_rect(sound_button).collidepoint(event.pos):
+                    if sound_manager.toggle():
+                        sound_manager.play("button")
+                elif state == GameState.START and ui_rect(start_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     load_level(0)
                     state = GameState.PLAYING
                 elif state == GameState.START and ui_rect(level_select_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     state = GameState.LEVEL_SELECT
                 elif state == GameState.START and ui_rect(quit_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     modal.open("quit")
                 elif state == GameState.LEVEL_SELECT:
                     if ui_rect(select_home_button).collidepoint(event.pos):
+                        sound_manager.play("button")
                         state = GameState.START
                     else:
                         for selected_index, button in enumerate(level_buttons):
                             if (selected_index <= highest_unlocked_index
                                     and ui_rect(button).collidepoint(event.pos)):
+                                sound_manager.play("button")
                                 load_level(selected_index)
                                 state = GameState.PLAYING
                                 break
                 elif state == GameState.PLAYING and ui_rect(restart_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     load_level(level_index)
                 elif state == GameState.PLAYING and ui_rect(hint_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     if hints_remaining <= 0:
                         message = "本关提示已用完"
                     else:
@@ -393,13 +448,35 @@ def run_game():
                 elif state == GameState.PLAYING and ui_rect(menu_button).collidepoint(event.pos):
                     # 飞出或碰撞中无法到达此分支，避免中断动画。
                     if flying_arrow is None and feedback_arrow is None:
+                        sound_manager.play("button")
                         modal.open("return_menu")
+                elif state == GameState.PLAYING and ui_rect(auto_solve_button).collidepoint(event.pos):
+                    sound_manager.play("button")
+                    # 求解器仅对深拷贝工作集写入 eliminated；真实 arrows 在拿到
+                    # 完整方案之前绝不变动，找到后才进入 FLYING 锁定所有玩法输入。
+                    if len(arrows) > AUTO_SOLVE_MAX_ARROWS:
+                        message = f"箭头数超过自动求解上限（{AUTO_SOLVE_MAX_ARROWS}）"
+                    else:
+                        try:
+                            solution = solve_level(
+                                arrows, BOARD_ROWS, BOARD_COLS, AUTO_SOLVE_MAX_NODES,
+                            )
+                        except SearchLimitExceeded:
+                            message = "当前关卡未找到解法（搜索达到上限）"
+                        else:
+                            if solution is None:
+                                message = "当前关卡未找到解法"
+                            else:
+                                auto_solution, auto_playing = list(solution), True
+                                hint_arrow, hint_elapsed = None, 0.0
+                                start_next_auto_arrow()
                 # 碰撞反馈仍未结束时锁定箭头输入；空白处点击安全忽略。
                 elif state == GameState.PLAYING and feedback_arrow is None:
                     clicked_arrow = arrow_at_position(arrows, event.pos, screen.get_width())
                     if clicked_arrow is not None:
                         hint_arrow, hint_elapsed = None, 0.0
                         if is_blocked(clicked_arrow, arrows, BOARD_ROWS, BOARD_COLS):
+                            sound_manager.play("blocked")
                             remaining_mistakes -= 1
                             score = max(0, score - BLOCKED_ARROW_PENALTY)
                             feedback_arrow, feedback_elapsed = clicked_arrow, 0.0
@@ -409,15 +486,19 @@ def run_game():
                             flying_arrow = clicked_arrow
                             state, message = GameState.FLYING, "成功飞出！"
                 elif state == GameState.WIN and ui_rect(next_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     load_level(level_index + 1)
                     state = GameState.PLAYING
                 elif state == GameState.LOSE:
                     if ui_rect(retry_button).collidepoint(event.pos):
+                        sound_manager.play("button")
                         load_level(level_index)
                         state = GameState.PLAYING
                     elif ui_rect(home_button).collidepoint(event.pos):
+                        sound_manager.play("button")
                         state = GameState.START
                 elif state == GameState.ALL_CLEAR and ui_rect(home_button).collidepoint(event.pos):
+                    sound_manager.play("button")
                     state = GameState.START
 
         screen.fill(COLOR["background"])
@@ -453,14 +534,19 @@ def run_game():
             draw_text(screen, f"剩余箭头：{len(arrows)}", small_font, COLOR["text"], (480 + layout_offset, 105))
             draw_text(screen, f"失误：{remaining_mistakes}", small_font, COLOR["text"], (650 + layout_offset, 105))
             draw_text(screen, f"提示：{hints_remaining}", small_font, COLOR["text"], (770 + layout_offset, 105))
+            sound_label = "音效：开" if sound_manager.enabled and sound_manager.available else "音效：关"
+            draw_button(screen, ui_rect(sound_button), sound_label, tiny_font, mouse_position, "secondary", state == GameState.PLAYING)
             hovered_arrow = arrow_at_position(arrows, mouse_position, screen.get_width()) if state == GameState.PLAYING and feedback_arrow is None else None
             draw_board(screen, arrows, feedback_arrow, hovered_arrow, hint_arrow)
             board_left = (screen.get_width() - BOARD_COLS * CELL_SIZE) // 2
             draw_text(screen, message, tiny_font, COLOR["muted_text"], (screen.get_width() // 2, 617))
             draw_panel(screen, pygame.Rect(board_left - 8, 626, BOARD_COLS * CELL_SIZE + 16, 58))
-            draw_button(screen, ui_rect(restart_button), "重新开始", small_font, mouse_position, "secondary")
-            draw_button(screen, ui_rect(hint_button), "提示", small_font, mouse_position, "secondary")
-            draw_button(screen, ui_rect(menu_button), "返回主菜单", tiny_font, mouse_position, "secondary")
+            # 四个底部按钮均使用较窄宽度，保证窗口默认尺寸下不重叠。
+            controls_enabled = state == GameState.PLAYING
+            draw_button(screen, ui_rect(restart_button), "重新开始", small_font, mouse_position, "secondary", controls_enabled)
+            draw_button(screen, ui_rect(hint_button), "提示", small_font, mouse_position, "secondary", controls_enabled)
+            draw_button(screen, ui_rect(menu_button), "返回主菜单", tiny_font, mouse_position, "secondary", controls_enabled)
+            draw_button(screen, ui_rect(auto_solve_button), "自动求解", tiny_font, mouse_position, "accent", controls_enabled)
         elif state == GameState.WIN:
             draw_panel(screen, pygame.Rect(205, 180, 550, 400))
             draw_text(screen, "第 %d 关完成" % (level_index + 1), title_font, COLOR["title"], (480, 240))
@@ -483,6 +569,13 @@ def run_game():
             draw_text(screen, f"恭喜你完成全部 {len(LEVELS)} 个关卡", normal_font, COLOR["muted_text"], (480, 405))
             draw_button(screen, home_button, "返回主菜单", normal_font, mouse_position, "secondary")
 
+        # 结算页从黑色遮罩中平滑淡入；不改变任何结算规则或按钮行为。
+        if result_state is not None:
+            fade_progress = min(1.0, result_elapsed / 0.35)
+            overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, round(210 * (1.0 - fade_progress))))
+            screen.blit(overlay, (0, 0))
+
         modal.draw(screen, large_font, small_font, small_font, mouse_position)
 
         pygame.display.flip()
@@ -499,7 +592,10 @@ from config import DIRECTION_STEPS as _DIRECTION_STEPS
 from game_logic import (create_level_arrows as _create_level_arrows,
                         calculate_stars as _calculate_stars,
                         find_available_arrow as _find_available_arrow,
-                        is_blocked as _is_blocked)
+                        is_blocked as _is_blocked,
+                        solve_level as _solve_level,
+                        SearchLimitExceeded as _SearchLimitExceeded)
+from audio import SoundManager as _SoundManager
 from rendering import (arrow_at_position as _arrow_at_position,
                        draw_board as _draw_board, draw_button as _draw_button,
                        draw_panel as _draw_panel, draw_text as _draw_text,
@@ -510,6 +606,8 @@ is_blocked = _is_blocked
 create_level_arrows = _create_level_arrows
 calculate_stars = _calculate_stars
 find_available_arrow = _find_available_arrow
+solve_level = _solve_level
+SearchLimitExceeded = _SearchLimitExceeded
 get_font = _get_font
 draw_text = _draw_text
 draw_panel = _draw_panel
@@ -517,6 +615,7 @@ draw_button = _draw_button
 draw_board = _draw_board
 arrow_at_position = _arrow_at_position
 ModalDialog = _ModalDialog
+SoundManager = _SoundManager
 
 
 if __name__ == "__main__":
