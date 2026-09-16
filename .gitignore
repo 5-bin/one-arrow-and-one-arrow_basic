@@ -18,3 +18,8 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# PyInstaller generated artifacts
+.pyinstaller-cache/
+build/
+dist/

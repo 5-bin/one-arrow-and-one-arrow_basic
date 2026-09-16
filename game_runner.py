@@ -1,207 +1,17 @@
 # -*- coding: utf-8 -*-
 """“一箭又一箭”Pygame 游戏运行循环。"""
 
-import copy
 import math
 import sys
-from enum import Enum, auto
-from pathlib import Path
 
 import pygame
 
-
-# ---------- 可配置的界面与玩法常量 ----------
-WINDOW_WIDTH, WINDOW_HEIGHT = 960, 700
-BOARD_ROWS, BOARD_COLS = 7, 8
-CELL_SIZE = 64
-PAGE_MARGIN = 32
-HEADER_HEIGHT = 132
-BOARD_LEFT = (WINDOW_WIDTH - BOARD_COLS * CELL_SIZE) // 2
-BOARD_TOP = 158
-PANEL_RADIUS = 16
-BUTTON_WIDTH, BUTTON_HEIGHT = 210, 58
-FLY_SPEED = 720
-FEEDBACK_TIME = 0.30
-MAX_HINTS_PER_LEVEL = 3
-HINT_TIME = 1.0
-
-# 明确指定含中文字符的字体文件，避免 SysFont 找不到字体时静默回退为
-# Pygame 默认字体，进而将中文渲染为方块或乱码。按当前系统依次尝试。
-CHINESE_FONT_PATHS = (
-    "/System/Library/Fonts/STHeiti Light.ttc",       # macOS
-    "/System/Library/Fonts/Hiragino Sans GB.ttc",    # macOS
-    "/Library/Fonts/Arial Unicode.ttf",              # macOS（部分设备）
-    "C:/Windows/Fonts/msyh.ttc",                     # Windows 微软雅黑
-    "C:/Windows/Fonts/simhei.ttf",                   # Windows 黑体
-    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",  # 常见 Linux 中文字体
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-)
-
-COLOR = {
-    "background": (35, 59, 80), "panel": (49, 79, 103),
-    "panel_border": (101, 139, 163), "board": (248, 241, 220),
-    "grid": (181, 163, 124), "text": (244, 248, 250),
-    "muted_text": (198, 218, 230), "accent": (48, 133, 84),
-    "accent_hover": (65, 157, 101), "secondary": (79, 105, 134),
-    "arrow": (238, 142, 48), "arrow_outline": (105, 58, 23),
-    "arrow_hover": (255, 207, 85), "danger": (213, 69, 63),
-    "danger_hover": (232, 88, 81), "title": (255, 235, 177),
-}
-
-
-class Direction(Enum):
-    UP = "UP"
-    DOWN = "DOWN"
-    LEFT = "LEFT"
-    RIGHT = "RIGHT"
-
-
-class GameState(Enum):
-    START = auto()
-    PLAYING = auto()
-    FLYING = auto()
-    WIN = auto()
-    LOSE = auto()
-    ALL_CLEAR = auto()
-
-
-DIRECTION_STEPS = {
-    Direction.UP: (-1, 0), Direction.DOWN: (1, 0),
-    Direction.LEFT: (0, -1), Direction.RIGHT: (0, 1),
-}
-
-
-# 关卡数据只在 config.py 维护。这里转换 Direction 类型，以复用运行器原有绘制和路径判断。
-from config import LEVELS as CONFIG_LEVELS
-
-LEVELS = copy.deepcopy(CONFIG_LEVELS)
-for _level in LEVELS:
-    for _arrow in _level["arrows"]:
-        _arrow["direction"] = Direction(_arrow["direction"].value)
-
-
-def is_blocked(arrow, arrows, rows, cols):
-    """检查箭头前方到边界间是否有未消除箭头；按坐标查找，不依赖列表顺序。"""
-    row_step, col_step = DIRECTION_STEPS[arrow["direction"]]
-    active_positions = {
-        (item["row"], item["col"])
-        for item in arrows if not item.get("eliminated", False)
-    }
-    check_row, check_col = arrow["row"] + row_step, arrow["col"] + col_step
-    while 0 <= check_row < rows and 0 <= check_col < cols:
-        if (check_row, check_col) in active_positions:
-            return True
-        check_row, check_col = check_row + row_step, check_col + col_step
-    return False
-
-
-def create_level_arrows(level_index):
-    """深拷贝关卡数据，重开或切关不会保留旧箭头的动画/消除状态。"""
-    arrows = copy.deepcopy(LEVELS[level_index]["arrows"])
-    for arrow in arrows:
-        arrow.update(eliminated=False, offset_x=0.0, offset_y=0.0)
-    return arrows
-
-
-def find_available_arrow(arrows):
-    """复用 is_blocked 找到任意一支当前可飞出的箭头；找不到则返回 None。"""
-    for arrow in arrows:
-        if not arrow["eliminated"] and not is_blocked(arrow, arrows, BOARD_ROWS, BOARD_COLS):
-            return arrow
-    return None
-
-
-def get_font(size):
-    """加载具有中文字形的字体文件；最后才尝试系统字体名称。"""
-    for font_path in CHINESE_FONT_PATHS:
-        if Path(font_path).is_file():
-            try:
-                return pygame.font.Font(font_path, size)
-            except pygame.error:
-                # 个别系统可能不支持某种字体集合格式，继续尝试下一项。
-                continue
-
-    # match_font 返回真实文件路径，优于 SysFont 的无提示默认字体回退。
-    for font_name in ("PingFang SC", "Microsoft YaHei", "SimHei", "Noto Sans CJK SC"):
-        font_path = pygame.font.match_font(font_name)
-        if font_path:
-            return pygame.font.Font(font_path, size)
-
-    # 极少数未安装中文字体的环境只能显示英文；提示用户安装字体。
-    return pygame.font.Font(None, size)
-
-
-def draw_text(screen, text, font, color, center):
-    surface = font.render(text, True, color)
-    screen.blit(surface, surface.get_rect(center=center))
-
-
-def draw_panel(screen, rect):
-    pygame.draw.rect(screen, COLOR["panel"], rect, border_radius=PANEL_RADIUS)
-    pygame.draw.rect(screen, COLOR["panel_border"], rect, width=2, border_radius=PANEL_RADIUS)
-
-
-def draw_button(screen, rect, text, font, mouse_position, color_name="accent"):
-    """按钮绘制和点击区域统一使用同一个 rect。"""
-    hovered = rect.collidepoint(mouse_position)
-    if color_name == "danger":
-        fill = COLOR["danger_hover"] if hovered else COLOR["danger"]
-    elif color_name == "secondary":
-        fill = tuple(min(255, value + 18) for value in COLOR["secondary"]) if hovered else COLOR["secondary"]
-    else:
-        fill = COLOR["accent_hover"] if hovered else COLOR["accent"]
-    pygame.draw.rect(screen, fill, rect, border_radius=12)
-    pygame.draw.rect(screen, (232, 245, 236), rect, width=2, border_radius=12)
-    draw_text(screen, text, font, COLOR["text"], rect.center)
-
-
-def draw_arrow(screen, arrow, fill_color, highlighted=False):
-    """绘制方向明确的箭头；高亮时加亮色圆形底座。"""
-    center_x = BOARD_LEFT + arrow["col"] * CELL_SIZE + CELL_SIZE // 2 + arrow["offset_x"]
-    center_y = BOARD_TOP + arrow["row"] * CELL_SIZE + CELL_SIZE // 2 + arrow["offset_y"]
-    if highlighted:
-        pygame.draw.circle(screen, (255, 234, 154), (round(center_x), round(center_y)), 27)
-
-    # 以“向上”为基础形状旋转，箭头头部和杆部可清晰识别。
-    base_points = [(0, -24), (17, -3), (8, -3), (8, 23), (-8, 23), (-8, -3), (-17, -3)]
-    points = []
-    for point_x, point_y in base_points:
-        if arrow["direction"] == Direction.DOWN:
-            point_x, point_y = -point_x, -point_y
-        elif arrow["direction"] == Direction.LEFT:
-            point_x, point_y = point_y, -point_x
-        elif arrow["direction"] == Direction.RIGHT:
-            point_x, point_y = -point_y, point_x
-        points.append((center_x + point_x, center_y + point_y))
-    pygame.draw.polygon(screen, fill_color, points)
-    pygame.draw.polygon(screen, COLOR["arrow_outline"], points, width=2)
-
-
-def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None, hint_arrow=None):
-    board_rect = pygame.Rect(BOARD_LEFT, BOARD_TOP, BOARD_COLS * CELL_SIZE, BOARD_ROWS * CELL_SIZE)
-    pygame.draw.rect(screen, (28, 45, 58), board_rect.inflate(12, 12), border_radius=12)
-    pygame.draw.rect(screen, COLOR["board"], board_rect, border_radius=8)
-    for row in range(BOARD_ROWS + 1):
-        y = BOARD_TOP + row * CELL_SIZE
-        pygame.draw.line(screen, COLOR["grid"], (BOARD_LEFT, y), (BOARD_LEFT + BOARD_COLS * CELL_SIZE, y), 2)
-    for col in range(BOARD_COLS + 1):
-        x = BOARD_LEFT + col * CELL_SIZE
-        pygame.draw.line(screen, COLOR["grid"], (x, BOARD_TOP), (x, BOARD_TOP + BOARD_ROWS * CELL_SIZE), 2)
-    for arrow in arrows:
-        if not arrow["eliminated"]:
-            is_hint = arrow is hint_arrow
-            color = COLOR["danger"] if arrow is feedback_arrow else COLOR["arrow_hover"] if is_hint else COLOR["arrow"]
-            draw_arrow(screen, arrow, color, arrow is hovered_arrow or is_hint)
-
-
-def arrow_at_position(arrows, mouse_position):
-    """点击或悬停空白格/棋盘外时安全返回 None。"""
-    mouse_x, mouse_y = mouse_position
-    col = (mouse_x - BOARD_LEFT) // CELL_SIZE
-    row = (mouse_y - BOARD_TOP) // CELL_SIZE
-    if not (0 <= row < BOARD_ROWS and 0 <= col < BOARD_COLS):
-        return None
-    return next((arrow for arrow in arrows if not arrow["eliminated"] and arrow["row"] == row and arrow["col"] == col), None)
+from audio import SoundManager
+from config import *  # noqa: F403
+from game_logic import (SearchLimitExceeded, calculate_stars, create_level_arrows,
+                        find_available_arrow, is_blocked, solve_level)
+from rendering import (ModalDialog, arrow_at_position, draw_board, draw_button,
+                       draw_panel, draw_text, get_font)
 
 
 def run_game():
@@ -248,9 +58,6 @@ def run_game():
     home_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 505, BUTTON_WIDTH, BUTTON_HEIGHT)
     retry_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
     sound_button = pygame.Rect(WINDOW_WIDTH - 118, 82, 86, 32)
-    # 临时保留到本次导航问题确认完成；设为 False 可关闭控制台输出。
-    debug_win_button_clicks = True
-
     def load_level(new_index):
         """唯一的关卡重置入口，保证切关和重开不残留任何动画状态。"""
         nonlocal level_index, arrows, remaining_mistakes, flying_arrow, feedback_arrow
@@ -379,17 +186,6 @@ def run_game():
         def ui_rect(rect):
             return rect.move(layout_offset, 0)
 
-        def debug_win_button_click(event_pos):
-            """输出结算页按钮命中信息，便于核对绘制与事件坐标。"""
-            if debug_win_button_clicks:
-                print(
-                    "[WIN UI] "
-                    f"state={state.name}, pos={event_pos}, "
-                    f"next={ui_rect(next_button)}, home={ui_rect(home_button)}, "
-                    f"home_hit={ui_rect(home_button).collidepoint(event_pos)}",
-                    flush=True,
-                )
-
         update(delta_time)
 
         for event in pygame.event.get():
@@ -499,7 +295,6 @@ def run_game():
                             flying_arrow = clicked_arrow
                             state, message = GameState.FLYING, "成功飞出！"
                 elif state == GameState.WIN:
-                    debug_win_button_click(event.pos)
                     if ui_rect(next_button).collidepoint(event.pos):
                         sound_manager.play("button")
                         load_level(level_index + 1)
@@ -600,40 +395,6 @@ def run_game():
 
     pygame.quit()
     sys.exit()
-
-
-# 从同级模块使用已拆分的规则、渲染与配置；上方旧定义保留为兼容参考，运行时
-# 统一由这些模块提供实现，便于后续分别维护。
-# 配置也以 config.py 为唯一来源，避免修改后出现两份不一致的数据。
-from config import *  # noqa: F403
-from config import DIRECTION_STEPS as _DIRECTION_STEPS
-from game_logic import (create_level_arrows as _create_level_arrows,
-                        calculate_stars as _calculate_stars,
-                        find_available_arrow as _find_available_arrow,
-                        is_blocked as _is_blocked,
-                        solve_level as _solve_level,
-                        SearchLimitExceeded as _SearchLimitExceeded)
-from audio import SoundManager as _SoundManager
-from rendering import (arrow_at_position as _arrow_at_position,
-                       draw_board as _draw_board, draw_button as _draw_button,
-                       draw_panel as _draw_panel, draw_text as _draw_text,
-                       get_font as _get_font, ModalDialog as _ModalDialog)
-
-DIRECTION_STEPS = _DIRECTION_STEPS
-is_blocked = _is_blocked
-create_level_arrows = _create_level_arrows
-calculate_stars = _calculate_stars
-find_available_arrow = _find_available_arrow
-solve_level = _solve_level
-SearchLimitExceeded = _SearchLimitExceeded
-get_font = _get_font
-draw_text = _draw_text
-draw_panel = _draw_panel
-draw_button = _draw_button
-draw_board = _draw_board
-arrow_at_position = _arrow_at_position
-ModalDialog = _ModalDialog
-SoundManager = _SoundManager
 
 
 if __name__ == "__main__":

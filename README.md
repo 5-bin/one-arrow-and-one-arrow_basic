@@ -8,16 +8,18 @@
 
 ### 直接运行源码
 
-运行环境为 Python 3.13 和 Pygame 2.6.1。进入项目根目录后执行：
+运行环境为 Python 3.13 和 Pygame 2.6.1。进入项目根目录后创建虚拟环境并安装锁定版本的依赖：
 
 ```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python main.py
 ```
 
-若本地尚未安装依赖，可在自己的虚拟环境中安装 Pygame 后执行：
+也可使用已激活的任意虚拟环境：
 
 ```bash
-python -m pip install pygame
+python -m pip install -r requirements.txt
 python main.py
 ```
 
