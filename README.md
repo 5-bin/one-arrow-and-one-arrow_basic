@@ -4,9 +4,11 @@
 
 项目包含 6 个难度递增的关卡、提示与自动求解、计分和星级评价、音效开关、关卡选择及失败重开等功能，并已提供 macOS 可执行版本。
 
-## 游戏截图
+## 游戏演示
 
-![第 1 关游戏界面](assets/screenshots/gameplay.png)
+![《一箭又一箭》完整流程演示](game_demo.gif)
+
+上方演示展示了主菜单、第 1 关的状态栏与操作区、阻挡箭头的碰撞反馈、提示高亮、按正确顺序消除箭头、三星通关结算，以及返回主菜单的导航流程。
 
 ## 开发环境
 
@@ -90,8 +92,9 @@ dist/一箭又一箭/一箭又一箭
 ├── game_logic.py           # 阻挡判断、提示选择、DFS 自动求解和星级计算
 ├── rendering.py            # 字体、棋盘、箭头、按钮和弹窗绘制
 ├── audio.py                # 本地音效加载与降级处理
+├── game_demo.gif           # README 使用的游戏流程演示动图
 ├── assets/sounds/          # 音效资源及来源说明
-├── assets/screenshots/     # README 使用的实际游戏截图
+├── assets/screenshots/     # 补充使用的静态游戏截图
 ├── tests/
 │   ├── test_game_logic.py  # 19 项纯逻辑自动化测试
 │   └── TEST_RECORD_TEMPLATE.md  # 人工测试记录表
