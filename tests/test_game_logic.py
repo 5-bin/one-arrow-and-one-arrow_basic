@@ -118,5 +118,21 @@ class TestLevelData(unittest.TestCase):
                 self.assertGreater(level["max_mistakes"], 0)
 
 
+class TestHintLogic(unittest.TestCase):
+    """提示功能只验证候选选择，动画高亮仍由人工试玩确认。"""
+
+    def test_hint_returns_an_unblocked_remaining_arrow(self):
+        blocked = make_arrow(3, 1, main.Direction.RIGHT)
+        available = make_arrow(3, 5, main.Direction.RIGHT)
+        hint = main.find_available_arrow([blocked, available])
+        self.assertIs(hint, available)
+        self.assertFalse(main.is_blocked(hint, [blocked, available], 7, 8))
+
+    def test_hint_returns_none_when_every_arrow_is_blocked(self):
+        left = make_arrow(3, 1, main.Direction.RIGHT)
+        right = make_arrow(3, 5, main.Direction.LEFT)
+        self.assertIsNone(main.find_available_arrow([left, right]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -20,6 +20,8 @@ PANEL_RADIUS = 16
 BUTTON_WIDTH, BUTTON_HEIGHT = 210, 58
 FLY_SPEED = 720
 FEEDBACK_TIME = 0.30
+MAX_HINTS_PER_LEVEL = 3
+HINT_TIME = 1.0
 
 COLOR = {
     "background": (35, 59, 80), "panel": (49, 79, 103),
@@ -112,6 +114,14 @@ def create_level_arrows(level_index):
     return arrows
 
 
+def find_available_arrow(arrows):
+    """复用 is_blocked 找到任意一支当前可飞出的箭头；找不到则返回 None。"""
+    for arrow in arrows:
+        if not arrow["eliminated"] and not is_blocked(arrow, arrows, BOARD_ROWS, BOARD_COLS):
+            return arrow
+    return None
+
+
 def get_font(size):
     for name in ("PingFang SC", "Microsoft YaHei", "SimHei"):
         font = pygame.font.SysFont(name, size)
@@ -166,7 +176,7 @@ def draw_arrow(screen, arrow, fill_color, highlighted=False):
     pygame.draw.polygon(screen, COLOR["arrow_outline"], points, width=2)
 
 
-def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None):
+def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None, hint_arrow=None):
     board_rect = pygame.Rect(BOARD_LEFT, BOARD_TOP, BOARD_COLS * CELL_SIZE, BOARD_ROWS * CELL_SIZE)
     pygame.draw.rect(screen, (28, 45, 58), board_rect.inflate(12, 12), border_radius=12)
     pygame.draw.rect(screen, COLOR["board"], board_rect, border_radius=8)
@@ -178,8 +188,9 @@ def draw_board(screen, arrows, feedback_arrow=None, hovered_arrow=None):
         pygame.draw.line(screen, COLOR["grid"], (x, BOARD_TOP), (x, BOARD_TOP + BOARD_ROWS * CELL_SIZE), 2)
     for arrow in arrows:
         if not arrow["eliminated"]:
-            color = COLOR["danger"] if arrow is feedback_arrow else COLOR["arrow"]
-            draw_arrow(screen, arrow, color, arrow is hovered_arrow)
+            is_hint = arrow is hint_arrow
+            color = COLOR["danger"] if arrow is feedback_arrow else COLOR["arrow_hover"] if is_hint else COLOR["arrow"]
+            draw_arrow(screen, arrow, color, arrow is hovered_arrow or is_hint)
 
 
 def arrow_at_position(arrows, mouse_position):
@@ -205,10 +216,14 @@ def run_game():
     remaining_mistakes = LEVELS[level_index]["max_mistakes"]
     flying_arrow = feedback_arrow = None
     feedback_elapsed, lose_after_feedback = 0.0, False
+    hints_remaining = MAX_HINTS_PER_LEVEL
+    hint_arrow = None
+    hint_elapsed = 0.0
     message = ""
 
     start_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 410, BUTTON_WIDTH, BUTTON_HEIGHT)
     restart_button = pygame.Rect(WINDOW_WIDTH - PAGE_MARGIN - 155, 75, 155, 46)
+    hint_button = pygame.Rect(590, 622, 156, 48)
     next_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
     home_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 505, BUTTON_WIDTH, BUTTON_HEIGHT)
     retry_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
@@ -216,18 +231,26 @@ def run_game():
     def load_level(new_index):
         """唯一的关卡重置入口，保证切关和重开不残留任何动画状态。"""
         nonlocal level_index, arrows, remaining_mistakes, flying_arrow, feedback_arrow
-        nonlocal feedback_elapsed, lose_after_feedback, message
+        nonlocal feedback_elapsed, lose_after_feedback, hints_remaining, hint_arrow, hint_elapsed, message
         level_index = new_index
         arrows = create_level_arrows(level_index)
         remaining_mistakes = LEVELS[level_index]["max_mistakes"]
         flying_arrow = feedback_arrow = None
         feedback_elapsed, lose_after_feedback = 0.0, False
+        hints_remaining = MAX_HINTS_PER_LEVEL
+        hint_arrow, hint_elapsed = None, 0.0
         message = "点击没有阻挡的箭头，让它飞出棋盘"
 
     running = True
     while running:
         delta_time = clock.tick(60) / 1000.0
         mouse_position = pygame.mouse.get_pos()
+
+        # 提示只维持一秒，不会自动消除箭头。
+        if hint_arrow is not None:
+            hint_elapsed += delta_time
+            if hint_elapsed >= HINT_TIME:
+                hint_arrow, hint_elapsed = None, 0.0
 
         # 飞行动画期间 state 为 FLYING，所有点击均不会处理。
         if state == GameState.FLYING and flying_arrow is not None:
@@ -242,6 +265,7 @@ def run_game():
                 if flying_arrow in arrows:
                     arrows.remove(flying_arrow)
                 flying_arrow = None
+                hint_arrow, hint_elapsed = None, 0.0
                 if not arrows:
                     state = GameState.ALL_CLEAR if level_index == len(LEVELS) - 1 else GameState.WIN
                 else:
@@ -271,10 +295,22 @@ def run_game():
                     state = GameState.PLAYING
                 elif state == GameState.PLAYING and restart_button.collidepoint(event.pos):
                     load_level(level_index)
+                elif state == GameState.PLAYING and hint_button.collidepoint(event.pos):
+                    if hints_remaining <= 0:
+                        message = "本关提示已用完"
+                    else:
+                        candidate = find_available_arrow(arrows)
+                        if candidate is None:
+                            message = "当前无可用提示"
+                        else:
+                            hints_remaining -= 1
+                            hint_arrow, hint_elapsed = candidate, 0.0
+                            message = "提示：高亮箭头可以飞出"
                 # 碰撞反馈仍未结束时锁定箭头输入；空白处点击安全忽略。
                 elif state == GameState.PLAYING and feedback_arrow is None:
                     clicked_arrow = arrow_at_position(arrows, event.pos)
                     if clicked_arrow is not None:
+                        hint_arrow, hint_elapsed = None, 0.0
                         if is_blocked(clicked_arrow, arrows, BOARD_ROWS, BOARD_COLS):
                             remaining_mistakes -= 1
                             feedback_arrow, feedback_elapsed = clicked_arrow, 0.0
@@ -305,14 +341,16 @@ def run_game():
             draw_panel(screen, pygame.Rect(PAGE_MARGIN, 20, WINDOW_WIDTH - PAGE_MARGIN * 2, HEADER_HEIGHT - 20))
             level = LEVELS[level_index]
             draw_text(screen, "一箭又一箭", large_font, COLOR["title"], (145, 58))
-            draw_text(screen, f"关卡：{level['name']}", normal_font, COLOR["text"], (190, 104))
-            draw_text(screen, f"剩余箭头：{len(arrows)}", normal_font, COLOR["text"], (455, 104))
-            draw_text(screen, f"剩余失误：{remaining_mistakes}", normal_font, COLOR["text"], (650, 104))
+            draw_text(screen, f"关卡：{level['name']}", normal_font, COLOR["text"], (170, 104))
+            draw_text(screen, f"剩余箭头：{len(arrows)}", normal_font, COLOR["text"], (390, 104))
+            draw_text(screen, f"剩余失误：{remaining_mistakes}", normal_font, COLOR["text"], (570, 104))
+            draw_text(screen, f"提示：{hints_remaining}", normal_font, COLOR["text"], (705, 104))
             draw_button(screen, restart_button, "重新开始", small_font, mouse_position, "secondary")
             hovered_arrow = arrow_at_position(arrows, mouse_position) if state == GameState.PLAYING and feedback_arrow is None else None
-            draw_board(screen, arrows, feedback_arrow, hovered_arrow)
-            draw_panel(screen, pygame.Rect(214, 620, 532, 52))
-            draw_text(screen, message, small_font, COLOR["muted_text"], (480, 646))
+            draw_board(screen, arrows, feedback_arrow, hovered_arrow, hint_arrow)
+            draw_panel(screen, pygame.Rect(214, 620, 360, 52))
+            draw_text(screen, message, small_font, COLOR["muted_text"], (394, 646))
+            draw_button(screen, hint_button, "提示", small_font, mouse_position, "secondary")
         elif state == GameState.WIN:
             draw_panel(screen, pygame.Rect(205, 180, 550, 400))
             draw_text(screen, "第 %d 关完成" % (level_index + 1), title_font, COLOR["title"], (480, 260))
