@@ -10,11 +10,11 @@ class SoundManager:
     """只加载 assets/sounds 中的免版权或自制音效，不依赖外部服务。"""
 
     FILENAMES = {
-        "button": "button.ogg",
-        "fly": "fly.ogg",
-        "blocked": "blocked.ogg",
-        "win": "win.ogg",
-        "lose": "lose.ogg",
+        "button": "button.wav",
+        "fly": "fly.wav",
+        "blocked": "blocked.wav",
+        "win": "win.wav",
+        "lose": "lose.wav",
     }
 
     def __init__(self, asset_dir=None):

@@ -248,6 +248,8 @@ def run_game():
     home_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 505, BUTTON_WIDTH, BUTTON_HEIGHT)
     retry_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
     sound_button = pygame.Rect(WINDOW_WIDTH - 118, 82, 86, 32)
+    # 临时保留到本次导航问题确认完成；设为 False 可关闭控制台输出。
+    debug_win_button_clicks = True
 
     def load_level(new_index):
         """唯一的关卡重置入口，保证切关和重开不残留任何动画状态。"""
@@ -377,6 +379,17 @@ def run_game():
         def ui_rect(rect):
             return rect.move(layout_offset, 0)
 
+        def debug_win_button_click(event_pos):
+            """输出结算页按钮命中信息，便于核对绘制与事件坐标。"""
+            if debug_win_button_clicks:
+                print(
+                    "[WIN UI] "
+                    f"state={state.name}, pos={event_pos}, "
+                    f"next={ui_rect(next_button)}, home={ui_rect(home_button)}, "
+                    f"home_hit={ui_rect(home_button).collidepoint(event_pos)}",
+                    flush=True,
+                )
+
         update(delta_time)
 
         for event in pygame.event.get():
@@ -485,10 +498,15 @@ def run_game():
                         else:
                             flying_arrow = clicked_arrow
                             state, message = GameState.FLYING, "成功飞出！"
-                elif state == GameState.WIN and ui_rect(next_button).collidepoint(event.pos):
-                    sound_manager.play("button")
-                    load_level(level_index + 1)
-                    state = GameState.PLAYING
+                elif state == GameState.WIN:
+                    debug_win_button_click(event.pos)
+                    if ui_rect(next_button).collidepoint(event.pos):
+                        sound_manager.play("button")
+                        load_level(level_index + 1)
+                        state = GameState.PLAYING
+                    elif ui_rect(home_button).collidepoint(event.pos):
+                        sound_manager.play("button")
+                        abandon_current_round()
                 elif state == GameState.LOSE:
                     if ui_rect(retry_button).collidepoint(event.pos):
                         sound_manager.play("button")
@@ -496,10 +514,10 @@ def run_game():
                         state = GameState.PLAYING
                     elif ui_rect(home_button).collidepoint(event.pos):
                         sound_manager.play("button")
-                        state = GameState.START
+                        abandon_current_round()
                 elif state == GameState.ALL_CLEAR and ui_rect(home_button).collidepoint(event.pos):
                     sound_manager.play("button")
-                    state = GameState.START
+                    abandon_current_round()
 
         screen.fill(COLOR["background"])
         if state == GameState.START:
@@ -548,26 +566,26 @@ def run_game():
             draw_button(screen, ui_rect(menu_button), "返回主菜单", tiny_font, mouse_position, "secondary", controls_enabled)
             draw_button(screen, ui_rect(auto_solve_button), "自动求解", tiny_font, mouse_position, "accent", controls_enabled)
         elif state == GameState.WIN:
-            draw_panel(screen, pygame.Rect(205, 180, 550, 400))
-            draw_text(screen, "第 %d 关完成" % (level_index + 1), title_font, COLOR["title"], (480, 240))
-            draw_text(screen, f"本关得分：{score}", normal_font, COLOR["text"], (480, 310))
-            draw_text(screen, f"完成用时：{elapsed_time:.1f}s", normal_font, COLOR["muted_text"], (480, 350))
-            draw_text(screen, "★" * earned_stars + "☆" * (3 - earned_stars), large_font, COLOR["title"], (480, 395))
-            draw_button(screen, next_button, "下一关", large_font, mouse_position)
-            draw_button(screen, home_button, "返回主菜单", normal_font, mouse_position, "secondary")
+            draw_panel(screen, ui_rect(pygame.Rect(205, 180, 550, 400)))
+            draw_text(screen, "第 %d 关完成" % (level_index + 1), title_font, COLOR["title"], (480 + layout_offset, 240))
+            draw_text(screen, f"本关得分：{score}", normal_font, COLOR["text"], (480 + layout_offset, 310))
+            draw_text(screen, f"完成用时：{elapsed_time:.1f}s", normal_font, COLOR["muted_text"], (480 + layout_offset, 350))
+            draw_text(screen, "★" * earned_stars + "☆" * (3 - earned_stars), large_font, COLOR["title"], (480 + layout_offset, 395))
+            draw_button(screen, ui_rect(next_button), "下一关", large_font, mouse_position)
+            draw_button(screen, ui_rect(home_button), "返回主菜单", normal_font, mouse_position, "secondary")
         elif state == GameState.LOSE:
-            draw_panel(screen, pygame.Rect(205, 180, 550, 400))
-            draw_text(screen, "挑战失败", title_font, (255, 190, 180), (480, 245))
-            draw_text(screen, "失误次数已用完，请调整消除顺序", normal_font, COLOR["muted_text"], (480, 315))
-            draw_button(screen, retry_button, "重新开始本关", normal_font, mouse_position, "danger")
-            draw_button(screen, home_button, "返回主菜单", normal_font, mouse_position, "secondary")
+            draw_panel(screen, ui_rect(pygame.Rect(205, 180, 550, 400)))
+            draw_text(screen, "挑战失败", title_font, (255, 190, 180), (480 + layout_offset, 245))
+            draw_text(screen, "失误次数已用完，请调整消除顺序", normal_font, COLOR["muted_text"], (480 + layout_offset, 315))
+            draw_button(screen, ui_rect(retry_button), "重新开始本关", normal_font, mouse_position, "danger")
+            draw_button(screen, ui_rect(home_button), "返回主菜单", normal_font, mouse_position, "secondary")
         elif state == GameState.ALL_CLEAR:
-            draw_panel(screen, pygame.Rect(205, 180, 550, 400))
-            draw_text(screen, "全部通关！", title_font, COLOR["title"], (480, 230))
-            draw_text(screen, f"本关得分：{score}    用时：{elapsed_time:.1f}s", normal_font, COLOR["text"], (480, 305))
-            draw_text(screen, "★" * earned_stars + "☆" * (3 - earned_stars), large_font, COLOR["title"], (480, 355))
-            draw_text(screen, f"恭喜你完成全部 {len(LEVELS)} 个关卡", normal_font, COLOR["muted_text"], (480, 405))
-            draw_button(screen, home_button, "返回主菜单", normal_font, mouse_position, "secondary")
+            draw_panel(screen, ui_rect(pygame.Rect(205, 180, 550, 400)))
+            draw_text(screen, "全部通关！", title_font, COLOR["title"], (480 + layout_offset, 230))
+            draw_text(screen, f"本关得分：{score}    用时：{elapsed_time:.1f}s", normal_font, COLOR["text"], (480 + layout_offset, 305))
+            draw_text(screen, "★" * earned_stars + "☆" * (3 - earned_stars), large_font, COLOR["title"], (480 + layout_offset, 355))
+            draw_text(screen, f"恭喜你完成全部 {len(LEVELS)} 个关卡", normal_font, COLOR["muted_text"], (480 + layout_offset, 405))
+            draw_button(screen, ui_rect(home_button), "返回主菜单", normal_font, mouse_position, "secondary")
 
         # 结算页从黑色遮罩中平滑淡入；不改变任何结算规则或按钮行为。
         if result_state is not None:
