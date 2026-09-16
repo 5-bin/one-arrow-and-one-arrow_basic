@@ -82,10 +82,14 @@ class TestLevelData(unittest.TestCase):
         [(3, 5), (3, 1), (6, 7)],
         [(6, 3), (1, 3), (4, 7)],
         [(0, 4), (2, 4), (5, 1), (5, 5), (6, 7)],
+        [(3, 4), (3, 1), (0, 2)],
+        [(6, 2), (4, 2), (1, 2), (5, 6)],
+        [(2, 6), (2, 4), (2, 1), (6, 3), (4, 0)],
     ]
 
     def test_t04_every_level_has_a_valid_clear_sequence(self):
-        """T04 前置条件：按给定顺序模拟消除，三关都能清空。"""
+        """T04 前置条件：按给定顺序模拟消除，每关都能清空。"""
+        self.assertEqual(len(main.LEVELS), 6)
         for level_index, solution in enumerate(self.SOLUTIONS):
             arrows = main.create_level_arrows(level_index)
             for row, col in solution:

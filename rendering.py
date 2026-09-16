@@ -37,13 +37,18 @@ def draw_button(screen, rect, text, font, mouse_position, color_name="accent"):
     hovered = rect.collidepoint(mouse_position)
     if color_name == "danger":
         fill = COLOR["danger_hover"] if hovered else COLOR["danger"]
+    elif color_name == "current_level":
+        fill = COLOR["current_level_hover"] if hovered else COLOR["current_level"]
+    elif color_name == "locked":
+        fill = COLOR["locked"]
     elif color_name == "secondary":
         fill = tuple(min(255, value + 18) for value in COLOR["secondary"]) if hovered else COLOR["secondary"]
     else:
         fill = COLOR["accent_hover"] if hovered else COLOR["accent"]
     pygame.draw.rect(screen, fill, rect, border_radius=12)
     pygame.draw.rect(screen, (232, 245, 236), rect, width=2, border_radius=12)
-    draw_text(screen, text, font, COLOR["text"], rect.center)
+    text_color = COLOR["locked_text"] if color_name == "locked" else COLOR["text"]
+    draw_text(screen, text, font, text_color, rect.center)
 
 
 def draw_arrow(screen, arrow, fill_color, highlighted=False):

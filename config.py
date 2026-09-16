@@ -37,6 +37,8 @@ COLOR = {
     "arrow": (238, 142, 48), "arrow_outline": (105, 58, 23),
     "arrow_hover": (255, 207, 85), "danger": (213, 69, 63),
     "danger_hover": (232, 88, 81), "title": (255, 235, 177),
+    "locked": (82, 91, 101), "locked_text": (175, 184, 190),
+    "current_level": (215, 152, 49), "current_level_hover": (237, 177, 62),
 }
 
 
@@ -49,6 +51,7 @@ class Direction(Enum):
 
 class GameState(Enum):
     START = auto()
+    LEVEL_SELECT = auto()
     PLAYING = auto()
     FLYING = auto()
     WIN = auto()
@@ -79,5 +82,23 @@ LEVELS = [
         {"row": 5, "col": 1, "direction": Direction.LEFT},
         {"row": 5, "col": 5, "direction": Direction.LEFT},
         {"row": 6, "col": 7, "direction": Direction.DOWN},
+    ]},
+    {"name": "第 4 关", "max_mistakes": 3, "arrows": [
+        {"row": 3, "col": 1, "direction": Direction.RIGHT},
+        {"row": 3, "col": 4, "direction": Direction.RIGHT},
+        {"row": 0, "col": 2, "direction": Direction.UP},
+    ]},
+    {"name": "第 5 关", "max_mistakes": 4, "arrows": [
+        {"row": 1, "col": 2, "direction": Direction.DOWN},
+        {"row": 4, "col": 2, "direction": Direction.DOWN},
+        {"row": 6, "col": 2, "direction": Direction.DOWN},
+        {"row": 5, "col": 6, "direction": Direction.RIGHT},
+    ]},
+    {"name": "第 6 关", "max_mistakes": 4, "arrows": [
+        {"row": 2, "col": 1, "direction": Direction.RIGHT},
+        {"row": 2, "col": 4, "direction": Direction.RIGHT},
+        {"row": 2, "col": 6, "direction": Direction.RIGHT},
+        {"row": 6, "col": 3, "direction": Direction.DOWN},
+        {"row": 4, "col": 0, "direction": Direction.LEFT},
     ]},
 ]

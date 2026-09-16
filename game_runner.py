@@ -238,6 +238,8 @@ def run_game():
     normal_font, small_font = get_font(24), get_font(20)
 
     state, level_index = GameState.START, 0
+    # 仅保存本次运行的通关进度；第 1 关始终默认解锁。
+    highest_unlocked_index = 0
     arrows = create_level_arrows(level_index)
     remaining_mistakes = LEVELS[level_index]["max_mistakes"]
     flying_arrow = feedback_arrow = None
@@ -247,7 +249,14 @@ def run_game():
     hint_elapsed = 0.0
     message = ""
 
-    start_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 410, BUTTON_WIDTH, BUTTON_HEIGHT)
+    start_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 390, BUTTON_WIDTH, BUTTON_HEIGHT)
+    level_select_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 465, BUTTON_WIDTH, BUTTON_HEIGHT)
+    quit_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 540, BUTTON_WIDTH, BUTTON_HEIGHT)
+    select_home_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 590, BUTTON_WIDTH, 46)
+    level_buttons = [
+        pygame.Rect(250 + (index % 3) * 160, 245 + (index // 3) * 110, 140, 76)
+        for index in range(len(LEVELS))
+    ]
     restart_button = pygame.Rect(WINDOW_WIDTH - PAGE_MARGIN - 155, 75, 155, 46)
     hint_button = pygame.Rect(590, 622, 156, 48)
     next_button = pygame.Rect((WINDOW_WIDTH - BUTTON_WIDTH) // 2, 430, BUTTON_WIDTH, BUTTON_HEIGHT)
@@ -293,6 +302,11 @@ def run_game():
                 flying_arrow = None
                 hint_arrow, hint_elapsed = None, 0.0
                 if not arrows:
+                    # 完成第 N 关后，开放第 N+1 关；最后一关不再增加索引。
+                    highest_unlocked_index = max(
+                        highest_unlocked_index,
+                        min(level_index + 1, len(LEVELS) - 1),
+                    )
                     state = GameState.ALL_CLEAR if level_index == len(LEVELS) - 1 else GameState.WIN
                 else:
                     state = GameState.PLAYING
@@ -319,6 +333,20 @@ def run_game():
                 if state == GameState.START and start_button.collidepoint(event.pos):
                     load_level(0)
                     state = GameState.PLAYING
+                elif state == GameState.START and level_select_button.collidepoint(event.pos):
+                    state = GameState.LEVEL_SELECT
+                elif state == GameState.START and quit_button.collidepoint(event.pos):
+                    running = False
+                elif state == GameState.LEVEL_SELECT:
+                    if select_home_button.collidepoint(event.pos):
+                        state = GameState.START
+                    else:
+                        for selected_index, button in enumerate(level_buttons):
+                            if (selected_index <= highest_unlocked_index
+                                    and button.collidepoint(event.pos)):
+                                load_level(selected_index)
+                                state = GameState.PLAYING
+                                break
                 elif state == GameState.PLAYING and restart_button.collidepoint(event.pos):
                     load_level(level_index)
                 elif state == GameState.PLAYING and hint_button.collidepoint(event.pos):
@@ -363,6 +391,22 @@ def run_game():
             draw_text(screen, "一箭又一箭", title_font, COLOR["title"], (480, 255))
             draw_text(screen, "用正确顺序让所有箭头飞出棋盘", normal_font, COLOR["muted_text"], (480, 320))
             draw_button(screen, start_button, "开始游戏", large_font, mouse_position)
+            draw_button(screen, level_select_button, "关卡选择", large_font, mouse_position, "secondary")
+            draw_button(screen, quit_button, "退出游戏", large_font, mouse_position, "danger")
+        elif state == GameState.LEVEL_SELECT:
+            draw_panel(screen, pygame.Rect(170, 120, 620, 540))
+            draw_text(screen, "关卡选择", title_font, COLOR["title"], (480, 185))
+            draw_text(screen, "完成当前关卡即可解锁下一关", small_font, COLOR["muted_text"], (480, 215))
+            draw_text(screen, "金色：当前    蓝色：已解锁    灰色：未解锁", small_font, COLOR["muted_text"], (480, 565))
+            for selected_index, button in enumerate(level_buttons):
+                if selected_index > highest_unlocked_index:
+                    style = "locked"
+                elif selected_index == level_index:
+                    style = "current_level"
+                else:
+                    style = "secondary"
+                draw_button(screen, button, f"第 {selected_index + 1} 关", small_font, mouse_position, style)
+            draw_button(screen, select_home_button, "返回开始界面", small_font, mouse_position, "secondary")
         elif state in (GameState.PLAYING, GameState.FLYING):
             draw_panel(screen, pygame.Rect(PAGE_MARGIN, 20, WINDOW_WIDTH - PAGE_MARGIN * 2, HEADER_HEIGHT - 20))
             level = LEVELS[level_index]
@@ -391,7 +435,7 @@ def run_game():
         elif state == GameState.ALL_CLEAR:
             draw_panel(screen, pygame.Rect(205, 180, 550, 400))
             draw_text(screen, "全部通关！", title_font, COLOR["title"], (480, 255))
-            draw_text(screen, "恭喜你完成全部三个关卡", normal_font, COLOR["muted_text"], (480, 325))
+            draw_text(screen, f"恭喜你完成全部 {len(LEVELS)} 个关卡", normal_font, COLOR["muted_text"], (480, 325))
             draw_button(screen, home_button, "返回开始界面", normal_font, mouse_position, "secondary")
 
         pygame.display.flip()
