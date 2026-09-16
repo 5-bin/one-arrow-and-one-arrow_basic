@@ -78,28 +78,37 @@ class TestBlockedLogic(unittest.TestCase):
 class TestLevelData(unittest.TestCase):
     """验证 T04、T06 关联的关卡可解性和重置数据。"""
 
-    SOLUTIONS = [
-        [(3, 5), (3, 1), (6, 7)],
-        [(6, 3), (1, 3), (4, 7)],
-        [(0, 4), (2, 4), (5, 1), (5, 5), (6, 7)],
-        [(3, 4), (3, 1), (0, 2)],
-        [(6, 2), (4, 2), (1, 2), (5, 6)],
-        [(2, 6), (2, 4), (2, 1), (6, 3), (4, 0)],
-    ]
-
     def test_t04_every_level_has_a_valid_clear_sequence(self):
-        """T04 前置条件：按给定顺序模拟消除，每关都能清空。"""
+        """T04：反复取任一可飞箭，验证每关均可完整清空。"""
         self.assertEqual(len(main.LEVELS), 6)
-        for level_index, solution in enumerate(self.SOLUTIONS):
+        for level_index, level in enumerate(main.LEVELS):
             arrows = main.create_level_arrows(level_index)
-            for row, col in solution:
-                arrow = next(item for item in arrows if item["row"] == row and item["col"] == col)
+            cleared_count = 0
+            while arrows:
+                arrow = next(
+                    (item for item in arrows if not main.is_blocked(
+                        item, arrows, main.BOARD_ROWS, main.BOARD_COLS)),
+                    None,
+                )
+                self.assertIsNotNone(
+                    arrow,
+                    f"第 {level_index + 1} 关剩余箭头没有可飞出的完整解",
+                )
                 self.assertFalse(
                     main.is_blocked(arrow, arrows, main.BOARD_ROWS, main.BOARD_COLS),
-                    msg=f"第 {level_index + 1} 关坐标 {(row, col)} 不应被阻挡",
+                    msg=f"第 {level_index + 1} 关坐标 {(arrow['row'], arrow['col'])} 不应被阻挡",
                 )
                 arrows.remove(arrow)
-            self.assertEqual(arrows, [], f"第 {level_index + 1} 关应被完全清空")
+                cleared_count += 1
+            self.assertEqual(cleared_count, len(level["arrows"]))
+
+    def test_level_difficulty_data_and_final_full_board(self):
+        """关卡数量递增，且最终关恰好填满固定 7×8 棋盘。"""
+        arrow_counts = [len(level["arrows"]) for level in main.LEVELS]
+        self.assertEqual(arrow_counts, sorted(arrow_counts))
+        self.assertEqual(arrow_counts[-1], main.BOARD_ROWS * main.BOARD_COLS)
+        final_positions = {(arrow["row"], arrow["col"]) for arrow in main.LEVELS[-1]["arrows"]}
+        self.assertEqual(len(final_positions), main.BOARD_ROWS * main.BOARD_COLS)
 
     def test_t06_restart_creates_a_clean_deep_copy(self):
         """T06：重开后箭头位置、偏移和消除状态均恢复，且不污染原关卡。"""

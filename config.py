@@ -93,39 +93,73 @@ DIRECTION_STEPS = {
 
 
 LEVELS = [
-    {"name": "第 1 关", "max_mistakes": 3, "arrows": [
-        {"row": 3, "col": 1, "direction": Direction.RIGHT},
-        {"row": 3, "col": 5, "direction": Direction.RIGHT},
-        {"row": 6, "col": 7, "direction": Direction.DOWN},
-    ]},
-    {"name": "第 2 关", "max_mistakes": 3, "arrows": [
-        {"row": 1, "col": 3, "direction": Direction.DOWN},
-        {"row": 6, "col": 3, "direction": Direction.DOWN},
-        {"row": 4, "col": 7, "direction": Direction.RIGHT},
-    ]},
-    {"name": "第 3 关", "max_mistakes": 4, "arrows": [
-        {"row": 0, "col": 4, "direction": Direction.UP},
-        {"row": 2, "col": 4, "direction": Direction.UP},
-        {"row": 5, "col": 1, "direction": Direction.LEFT},
-        {"row": 5, "col": 5, "direction": Direction.LEFT},
-        {"row": 6, "col": 7, "direction": Direction.DOWN},
-    ]},
-    {"name": "第 4 关", "max_mistakes": 3, "arrows": [
-        {"row": 3, "col": 1, "direction": Direction.RIGHT},
-        {"row": 3, "col": 4, "direction": Direction.RIGHT},
-        {"row": 0, "col": 2, "direction": Direction.UP},
-    ]},
-    {"name": "第 5 关", "max_mistakes": 4, "arrows": [
-        {"row": 1, "col": 2, "direction": Direction.DOWN},
-        {"row": 4, "col": 2, "direction": Direction.DOWN},
-        {"row": 6, "col": 2, "direction": Direction.DOWN},
-        {"row": 5, "col": 6, "direction": Direction.RIGHT},
-    ]},
-    {"name": "第 6 关", "max_mistakes": 4, "arrows": [
-        {"row": 2, "col": 1, "direction": Direction.RIGHT},
-        {"row": 2, "col": 4, "direction": Direction.RIGHT},
-        {"row": 2, "col": 6, "direction": Direction.RIGHT},
-        {"row": 6, "col": 3, "direction": Direction.DOWN},
-        {"row": 4, "col": 0, "direction": Direction.LEFT},
-    ]},
+    {
+        "name": "第 1 关", "max_mistakes": 6,
+        "arrows": [
+            {"row": 3, "col": 2, "direction": Direction.RIGHT},
+            {"row": 3, "col": 5, "direction": Direction.RIGHT},
+            {"row": 6, "col": 7, "direction": Direction.DOWN},
+        ],
+        # 通关顺序：(3, 5) → (3, 2)；(6, 7) 任意时刻均可。
+    },
+    {
+        "name": "第 2 关", "max_mistakes": 6,
+        "arrows": [
+            {"row": 3, "col": 1, "direction": Direction.RIGHT}, {"row": 3, "col": 4, "direction": Direction.RIGHT}, {"row": 3, "col": 6, "direction": Direction.RIGHT},
+            {"row": 5, "col": 2, "direction": Direction.UP}, {"row": 2, "col": 2, "direction": Direction.UP},
+            {"row": 1, "col": 5, "direction": Direction.DOWN}, {"row": 5, "col": 5, "direction": Direction.DOWN},
+            {"row": 4, "col": 7, "direction": Direction.LEFT},
+        ],
+        # 通关顺序：(3, 6) → (3, 4) → (3, 1)；(2, 2) → (5, 2)；(5, 5) → (1, 5)；最后 (4, 7)。
+    },
+    {
+        "name": "第 3 关", "max_mistakes": 5,
+        "arrows": [
+            {"row": 1, "col": 1, "direction": Direction.RIGHT}, {"row": 1, "col": 3, "direction": Direction.RIGHT}, {"row": 1, "col": 6, "direction": Direction.RIGHT},
+            {"row": 5, "col": 6, "direction": Direction.LEFT}, {"row": 5, "col": 4, "direction": Direction.LEFT}, {"row": 5, "col": 1, "direction": Direction.LEFT},
+            {"row": 6, "col": 2, "direction": Direction.UP}, {"row": 4, "col": 2, "direction": Direction.UP}, {"row": 2, "col": 2, "direction": Direction.UP},
+            {"row": 0, "col": 5, "direction": Direction.DOWN}, {"row": 2, "col": 5, "direction": Direction.DOWN}, {"row": 4, "col": 5, "direction": Direction.DOWN},
+            {"row": 6, "col": 7, "direction": Direction.DOWN}, {"row": 0, "col": 0, "direction": Direction.UP},
+        ],
+        # 通关顺序：四条链可交替处理：右 (1,6→3→1)、左 (5,1→4→6)、上 (2,2→4,2→6,2)、下 (4,5→2,5→0,5)；两支边缘箭任意时刻可出。
+    },
+    {
+        "name": "第 4 关", "max_mistakes": 5,
+        "arrows": [
+            {"row": 1, "col": 0, "direction": Direction.RIGHT}, {"row": 1, "col": 2, "direction": Direction.RIGHT}, {"row": 1, "col": 4, "direction": Direction.RIGHT}, {"row": 1, "col": 6, "direction": Direction.RIGHT},
+            {"row": 5, "col": 7, "direction": Direction.LEFT}, {"row": 5, "col": 5, "direction": Direction.LEFT}, {"row": 5, "col": 3, "direction": Direction.LEFT}, {"row": 5, "col": 1, "direction": Direction.LEFT},
+            {"row": 6, "col": 0, "direction": Direction.UP}, {"row": 4, "col": 0, "direction": Direction.UP}, {"row": 2, "col": 0, "direction": Direction.UP},
+            {"row": 0, "col": 7, "direction": Direction.DOWN}, {"row": 2, "col": 7, "direction": Direction.DOWN}, {"row": 4, "col": 7, "direction": Direction.DOWN},
+            {"row": 3, "col": 1, "direction": Direction.RIGHT}, {"row": 3, "col": 3, "direction": Direction.RIGHT}, {"row": 3, "col": 5, "direction": Direction.RIGHT}, {"row": 3, "col": 7, "direction": Direction.RIGHT},
+        ],
+        # 通关顺序：先清中行 (3,7→5→3→1)；再清上方右链和下方左链。随后解锁两侧纵链：左 (2,0→4,0→6,0)，右 (4,7→2,7→0,7)。
+    },
+    {
+        "name": "第 5 关", "max_mistakes": 4,
+        "arrows": [
+            {"row": 1, "col": 0, "direction": Direction.RIGHT}, {"row": 1, "col": 2, "direction": Direction.RIGHT}, {"row": 1, "col": 4, "direction": Direction.RIGHT}, {"row": 1, "col": 6, "direction": Direction.RIGHT},
+            {"row": 5, "col": 7, "direction": Direction.LEFT}, {"row": 5, "col": 5, "direction": Direction.LEFT}, {"row": 5, "col": 3, "direction": Direction.LEFT}, {"row": 5, "col": 1, "direction": Direction.LEFT},
+            {"row": 6, "col": 0, "direction": Direction.UP}, {"row": 4, "col": 0, "direction": Direction.UP}, {"row": 2, "col": 0, "direction": Direction.UP},
+            {"row": 0, "col": 7, "direction": Direction.DOWN}, {"row": 2, "col": 7, "direction": Direction.DOWN}, {"row": 4, "col": 7, "direction": Direction.DOWN},
+            {"row": 3, "col": 1, "direction": Direction.RIGHT}, {"row": 3, "col": 3, "direction": Direction.RIGHT}, {"row": 3, "col": 5, "direction": Direction.RIGHT}, {"row": 3, "col": 7, "direction": Direction.RIGHT},
+            {"row": 6, "col": 7, "direction": Direction.LEFT}, {"row": 6, "col": 5, "direction": Direction.LEFT}, {"row": 6, "col": 3, "direction": Direction.LEFT}, {"row": 6, "col": 1, "direction": Direction.LEFT},
+            {"row": 0, "col": 4, "direction": Direction.DOWN}, {"row": 2, "col": 4, "direction": Direction.DOWN}, {"row": 4, "col": 4, "direction": Direction.DOWN}, {"row": 6, "col": 4, "direction": Direction.DOWN},
+            {"row": 6, "col": 6, "direction": Direction.UP}, {"row": 4, "col": 6, "direction": Direction.UP}, {"row": 2, "col": 6, "direction": Direction.UP},
+            {"row": 0, "col": 0, "direction": Direction.UP},
+        ],
+        # 通关顺序：中行右链 → 上方右链；左纵链 → 底行左链；再依次处理右纵链、中央下链、左侧下方横链。可在已解锁的链之间切换。
+    },
+    {
+        "name": "第 6 关", "max_mistakes": 3,
+        "arrows": [
+            {"row": 0, "col": 0, "direction": Direction.UP}, {"row": 0, "col": 1, "direction": Direction.UP}, {"row": 0, "col": 2, "direction": Direction.UP}, {"row": 0, "col": 3, "direction": Direction.UP}, {"row": 0, "col": 4, "direction": Direction.UP}, {"row": 0, "col": 5, "direction": Direction.UP}, {"row": 0, "col": 6, "direction": Direction.UP}, {"row": 0, "col": 7, "direction": Direction.UP},
+            {"row": 1, "col": 0, "direction": Direction.LEFT}, {"row": 1, "col": 1, "direction": Direction.UP}, {"row": 1, "col": 2, "direction": Direction.UP}, {"row": 1, "col": 3, "direction": Direction.UP}, {"row": 1, "col": 4, "direction": Direction.UP}, {"row": 1, "col": 5, "direction": Direction.UP}, {"row": 1, "col": 6, "direction": Direction.UP}, {"row": 1, "col": 7, "direction": Direction.RIGHT},
+            {"row": 2, "col": 0, "direction": Direction.LEFT}, {"row": 2, "col": 1, "direction": Direction.LEFT}, {"row": 2, "col": 2, "direction": Direction.UP}, {"row": 2, "col": 3, "direction": Direction.UP}, {"row": 2, "col": 4, "direction": Direction.UP}, {"row": 2, "col": 5, "direction": Direction.UP}, {"row": 2, "col": 6, "direction": Direction.RIGHT}, {"row": 2, "col": 7, "direction": Direction.RIGHT},
+            {"row": 3, "col": 0, "direction": Direction.LEFT}, {"row": 3, "col": 1, "direction": Direction.LEFT}, {"row": 3, "col": 2, "direction": Direction.LEFT}, {"row": 3, "col": 3, "direction": Direction.UP}, {"row": 3, "col": 4, "direction": Direction.UP}, {"row": 3, "col": 5, "direction": Direction.RIGHT}, {"row": 3, "col": 6, "direction": Direction.RIGHT}, {"row": 3, "col": 7, "direction": Direction.RIGHT},
+            {"row": 4, "col": 0, "direction": Direction.LEFT}, {"row": 4, "col": 1, "direction": Direction.LEFT}, {"row": 4, "col": 2, "direction": Direction.DOWN}, {"row": 4, "col": 3, "direction": Direction.DOWN}, {"row": 4, "col": 4, "direction": Direction.DOWN}, {"row": 4, "col": 5, "direction": Direction.DOWN}, {"row": 4, "col": 6, "direction": Direction.RIGHT}, {"row": 4, "col": 7, "direction": Direction.RIGHT},
+            {"row": 5, "col": 0, "direction": Direction.LEFT}, {"row": 5, "col": 1, "direction": Direction.DOWN}, {"row": 5, "col": 2, "direction": Direction.DOWN}, {"row": 5, "col": 3, "direction": Direction.DOWN}, {"row": 5, "col": 4, "direction": Direction.DOWN}, {"row": 5, "col": 5, "direction": Direction.DOWN}, {"row": 5, "col": 6, "direction": Direction.DOWN}, {"row": 5, "col": 7, "direction": Direction.RIGHT},
+            {"row": 6, "col": 0, "direction": Direction.DOWN}, {"row": 6, "col": 1, "direction": Direction.DOWN}, {"row": 6, "col": 2, "direction": Direction.DOWN}, {"row": 6, "col": 3, "direction": Direction.DOWN}, {"row": 6, "col": 4, "direction": Direction.DOWN}, {"row": 6, "col": 5, "direction": Direction.DOWN}, {"row": 6, "col": 6, "direction": Direction.DOWN}, {"row": 6, "col": 7, "direction": Direction.DOWN},
+        ],
+        # 通关顺序：按“外圈 → 次外圈 → 内圈 → 中心”剥洋葱；同一圈中，所有朝已清空边界的箭均可任选。最后清 (3,3)、(3,4)。
+    },
 ]

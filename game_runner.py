@@ -71,38 +71,13 @@ DIRECTION_STEPS = {
 }
 
 
-# 每关都有至少一个通关顺序，坐标从 (0, 0) 开始。
-LEVELS = [
-    {
-        "name": "第 1 关", "max_mistakes": 3,
-        "arrows": [
-            {"row": 3, "col": 1, "direction": Direction.RIGHT},
-            {"row": 3, "col": 5, "direction": Direction.RIGHT},
-            {"row": 6, "col": 7, "direction": Direction.DOWN},
-        ],
-        # 通关顺序：(3, 5) → (3, 1) → (6, 7)
-    },
-    {
-        "name": "第 2 关", "max_mistakes": 3,
-        "arrows": [
-            {"row": 1, "col": 3, "direction": Direction.DOWN},
-            {"row": 6, "col": 3, "direction": Direction.DOWN},
-            {"row": 4, "col": 7, "direction": Direction.RIGHT},
-        ],
-        # 通关顺序：(6, 3) → (1, 3) → (4, 7)
-    },
-    {
-        "name": "第 3 关", "max_mistakes": 4,
-        "arrows": [
-            {"row": 0, "col": 4, "direction": Direction.UP},
-            {"row": 2, "col": 4, "direction": Direction.UP},
-            {"row": 5, "col": 1, "direction": Direction.LEFT},
-            {"row": 5, "col": 5, "direction": Direction.LEFT},
-            {"row": 6, "col": 7, "direction": Direction.DOWN},
-        ],
-        # 通关顺序：(0, 4) → (2, 4) → (5, 1) → (5, 5) → (6, 7)
-    },
-]
+# 关卡数据只在 config.py 维护。这里转换 Direction 类型，以复用运行器原有绘制和路径判断。
+from config import LEVELS as CONFIG_LEVELS
+
+LEVELS = copy.deepcopy(CONFIG_LEVELS)
+for _level in LEVELS:
+    for _arrow in _level["arrows"]:
+        _arrow["direction"] = Direction(_arrow["direction"].value)
 
 
 def is_blocked(arrow, arrows, rows, cols):
