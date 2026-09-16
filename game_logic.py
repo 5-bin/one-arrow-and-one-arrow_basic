@@ -3,7 +3,7 @@
 
 import copy
 
-from config import BOARD_COLS, BOARD_ROWS, LEVELS
+from config import BOARD_COLS, BOARD_ROWS, LEVELS, STAR_THRESHOLDS
 
 
 def is_blocked(arrow, arrows, rows, cols):
@@ -30,3 +30,14 @@ def create_level_arrows(level_index):
 def find_available_arrow(arrows):
     """返回任意一支当前可飞出的箭头，或 None。"""
     return next((arrow for arrow in arrows if not arrow["eliminated"] and not is_blocked(arrow, arrows, BOARD_ROWS, BOARD_COLS)), None)
+
+
+def calculate_stars(score, elapsed_time, arrow_count, score_per_arrow):
+    """根据配置的分数比例和完成时间，返回 1 到 3 星。"""
+    max_score = arrow_count * score_per_arrow
+    score_ratio = score / max_score if max_score else 0.0
+    for stars in (3, 2):
+        rule = STAR_THRESHOLDS[stars]
+        if score_ratio >= rule["min_score_ratio"] and elapsed_time <= rule["max_seconds"]:
+            return stars
+    return 1

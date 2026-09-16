@@ -138,5 +138,18 @@ class TestHintLogic(unittest.TestCase):
         self.assertIsNone(main.find_available_arrow([left, right]))
 
 
+class TestStarRating(unittest.TestCase):
+    """星级仅依赖配置的分数比例和完成时间，便于独立验证。"""
+
+    def test_three_stars_requires_high_score_and_fast_time(self):
+        self.assertEqual(main.calculate_stars(300, 20.0, 3, 100), 3)
+
+    def test_two_stars_when_three_star_time_is_missed(self):
+        self.assertEqual(main.calculate_stars(300, 45.0, 3, 100), 2)
+
+    def test_one_star_when_score_or_time_does_not_meet_two_stars(self):
+        self.assertEqual(main.calculate_stars(150, 61.0, 3, 100), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
