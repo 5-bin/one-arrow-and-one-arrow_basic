@@ -38,9 +38,13 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
+### 运行发布版本
+
+可从 [v1.0.0 Release](https://github.com/5-bin/one-arrow-and-one-arrow_basic/releases/tag/v1.0.0) 下载 `one-arrow-and-one-arrow-macos-arm64.zip`。该发布包适用于 macOS Apple Silicon（arm64）；下载并解压后，打开其中的“一箭又一箭.app”即可运行。
+
 ### 构建 macOS 打包版本
 
-仓库仅保存源码和 PyInstaller 配置，未提交 `dist/` 目录中的构建产物。安装 PyInstaller 后，在项目根目录执行：
+仓库仅保存源码和 PyInstaller 配置，未提交 `dist/` 目录中的构建产物。若需自行构建，安装 PyInstaller 后在项目根目录执行：
 
 ```bash
 ./.venv/bin/python -m pip install pyinstaller==6.22.3
