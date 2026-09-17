@@ -2,7 +2,7 @@
 
 “一箭又一箭”是一款使用 Python 与 Pygame 开发的单机益智小游戏。玩家需要判断箭头前方是否畅通，选择没有被其他箭头阻挡的箭头，使其飞出棋盘；清除全部箭头即可通关。
 
-项目包含 6 个难度递增的关卡、提示与自动求解、计分和星级评价、音效开关、关卡选择及失败重开等功能，并已提供 macOS 可执行版本。
+项目包含 6 个难度递增的关卡、提示与自动求解、计分和星级评价、音效开关、关卡选择及失败重开等功能，并提供 macOS 打包配置。
 
 ## 游戏演示
 
@@ -38,19 +38,22 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-### 运行打包版本
+### 构建 macOS 打包版本
 
-macOS 可执行程序位于：
+仓库仅保存源码和 PyInstaller 配置，未提交 `dist/` 目录中的构建产物。安装 PyInstaller 后，在项目根目录执行：
+
+```bash
+./.venv/bin/python -m pip install pyinstaller==6.22.3
+./.venv/bin/python -m PyInstaller --noconfirm --clean 一箭又一箭.spec
+```
+
+构建完成后，macOS 应用程序位于：
 
 ```text
 dist/一箭又一箭.app
 ```
 
-也可使用命令行版本：
-
-```text
-dist/一箭又一箭/一箭又一箭
-```
+`build/` 和 `dist/` 均为可重新生成的构建目录，已由 `.gitignore` 排除，不属于仓库缺失文件。
 
 ## 游戏规则
 
@@ -92,6 +95,7 @@ dist/一箭又一箭/一箭又一箭
 ├── game_logic.py           # 阻挡判断、提示选择、DFS 自动求解和星级计算
 ├── rendering.py            # 字体、棋盘、箭头、按钮和弹窗绘制
 ├── audio.py                # 本地音效加载与降级处理
+├── 一箭又一箭.spec          # PyInstaller 的 macOS 打包配置
 ├── game_demo.gif           # README 使用的游戏流程演示动图
 ├── assets/sounds/          # 音效资源及来源说明
 ├── assets/screenshots/     # 补充使用的静态游戏截图
@@ -99,6 +103,7 @@ dist/一箭又一箭/一箭又一箭
 │   ├── test_game_logic.py  # 19 项纯逻辑自动化测试
 │   └── TEST_RECORD_TEMPLATE.md  # 人工测试记录表
 ├── docs/项目报告.md         # 作业提交用项目报告
+└── requirements.txt         # 运行时 Python 依赖
 ```
 
 ## 测试
